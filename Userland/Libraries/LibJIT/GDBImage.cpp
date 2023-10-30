@@ -197,10 +197,12 @@ OwnPtr<GDBImage> GDBImage::create_from_code(ReadonlyBytes generated_code)
         return nullptr;
     }
 
-    return make<GDBImage>(Bytes {
+    auto elf_contents = Bytes {
         reinterpret_cast<uint8_t*>(mapped),
-        total_image_size.value_unchecked(),
-    });
+        total_image_size.value_unchecked()
+    };
+
+    return make<GDBImage>(elf_contents, code_contents);
 }
 
 GDBImage::~GDBImage()

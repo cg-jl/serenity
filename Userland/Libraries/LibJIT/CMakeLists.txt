@@ -2,6 +2,7 @@ set(SOURCES
     Assembler.cpp
     GDB.cpp
     GDBImage.cpp
+    RawImage.cpp
 )
 
 serenity_lib(LibJIT jit)
