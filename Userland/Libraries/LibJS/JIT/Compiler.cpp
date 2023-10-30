@@ -6,6 +6,8 @@
 
 #include <AK/OwnPtr.h>
 #include <AK/Platform.h>
+#include <LibJIT/GDBImage.h>
+#include <LibJIT/RawImage.h>
 #include <LibJS/Bytecode/CommonImplementations.h>
 #include <LibJS/Bytecode/Instruction.h>
 #include <LibJS/Bytecode/Interpreter.h>
@@ -1384,18 +1386,22 @@ OwnPtr<NativeExecutable> Compiler::compile(Bytecode::Executable& bytecode_execut
         (void)write(STDOUT_FILENO, compiler.m_output.data(), compiler.m_output.size());
     }
 
-    memcpy(executable_memory, compiler.m_output.data(), compiler.m_output.size());
+    OwnPtr<ExecutableImage> exe_image { nullptr };
 
-    if (mprotect(executable_memory, compiler.m_output.size(), PROT_READ | PROT_EXEC) < 0) {
-        dbgln("mprotect: {}", strerror(errno));
-        return nullptr;
+    if (getenv("LIBJS_JIT_GDB")) {
+        exe_image = ::JIT::GDBImage::create_from_code(compiler.m_output.span());
+    } else {
+        exe_image = ::JIT::RawImage::create_from_code(compiler.m_output.span());
     }
+
+    if (!exe_image)
+        return nullptr;
 
     if constexpr (LOG_JIT_SUCCESS) {
         dbgln("\033[32;1mJIT compilation succeeded!\033[0m {}", bytecode_executable.name);
     }
 
-    auto executable = make<NativeExecutable>(executable_memory, compiler.m_output.size());
+    auto executable = make<NativeExecutable>(exe_image.release_nonnull());
     if constexpr (DUMP_JIT_DISASSEMBLY)
         executable->dump_disassembly();
     return executable;

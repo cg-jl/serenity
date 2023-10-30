@@ -12,21 +12,15 @@
 
 namespace JS::JIT {
 
-NativeExecutable::NativeExecutable(void* code, size_t size)
-    : m_code(code)
-    , m_size(size)
+NativeExecutable::NativeExecutable(NonnullOwnPtr<ExecutableImage> code_image)
+    : m_image(move(code_image))
 {
-}
-
-NativeExecutable::~NativeExecutable()
-{
-    munmap(m_code, m_size);
 }
 
 void NativeExecutable::run(VM& vm) const
 {
     typedef void (*JITCode)(VM&, Value* registers, Value* locals);
-    ((JITCode)m_code)(vm,
+    ((JITCode)m_image->runnable_code().data())(vm,
         vm.bytecode_interpreter().registers().data(),
         vm.running_execution_context().local_variables.data());
 }
@@ -34,13 +28,14 @@ void NativeExecutable::run(VM& vm) const
 void NativeExecutable::dump_disassembly() const
 {
 #if ARCH(X86_64)
-    auto const* code_bytes = static_cast<u8 const*>(m_code);
-    auto stream = X86::SimpleInstructionStream { code_bytes, m_size };
+    auto const code = m_image->runnable_code();
+    auto const* code_bytes = code.data();
+    auto stream = X86::SimpleInstructionStream { code_bytes, code.size() };
     auto disassembler = X86::Disassembler(stream);
 
     while (true) {
         auto offset = stream.offset();
-        auto virtual_offset = bit_cast<size_t>(m_code) + offset;
+        auto virtual_offset = bit_cast<size_t>(code.data()) + offset;
         auto insn = disassembler.next();
         if (!insn.has_value())
             break;
